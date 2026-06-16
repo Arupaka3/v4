@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Plus, ChevronRight, Calendar, TrendingUp, Flame, Sparkles, X, Trash2, User, Edit2 } from 'lucide-react';
-import type { Receipt, ActiveTab } from '../types';
+import type { Receipt, ActiveTab, Streak } from '../types';
 
 interface HomeViewProps {
   receipts: Receipt[];
+  streak?: Streak;
   onNavigate: (tab: ActiveTab) => void;
   onDeleteReceipt?: (id: string) => void; // 履歴削除用
   onOpenSettings?: () => void;
@@ -12,6 +13,7 @@ interface HomeViewProps {
 
 const HomeView: React.FC<HomeViewProps> = ({ 
   receipts, 
+  streak,
   onNavigate, 
   onDeleteReceipt, 
   onOpenSettings, 
@@ -60,16 +62,7 @@ const HomeView: React.FC<HomeViewProps> = ({
 
   // --- ストリークの動的計算 ---
   // 1. コンビニ未利用日数
-  // 最新のレシートの日付から今日(2026-05-31)までの経過日数
-  let noConvenienceStreak = 0;
-  if (receipts.length > 0) {
-    // 日付順にソート (降順)
-    const sorted = [...receipts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const lastDate = new Date(sorted[0].date);
-    const diffTime = today.getTime() - lastDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    noConvenienceStreak = Math.max(0, diffDays);
-  }
+  const noConvenienceStreak = streak ? streak.currentStreak : 0;
 
   // 2. 深夜利用なし日数
   // 最後に深夜利用(22:00-05:00)したレシートの日付から今日までの経過日数

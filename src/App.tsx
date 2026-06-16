@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { ActiveTab, Receipt, SpendingGoal, SavingsGoal } from './types';
+import type { ActiveTab, Receipt, SpendingGoal, SavingsGoal, Streak } from './types';
 import TabBar from './components/TabBar';
 import HomeView from './components/HomeView';
 import ScanView from './components/ScanView';
@@ -38,6 +38,9 @@ function App() {
   const [monthlyBaseSavings, setMonthlyBaseSavings] = useState<number>(5000);
   // 月間収入 (Supabaseで永続化) (NEW)
   const [monthlyIncome, setMonthlyIncome] = useState<number | null>(null);
+  // ストリーク (Supabaseで永続化) (NEW)
+  const [streak, setStreak] = useState<Streak>({ currentStreak: 0, bestStreak: 0, lastConviniDate: null });
+  const [activeMilestone, setActiveMilestone] = useState<{ days: number; message: string } | null>(null);
 
   const [linkedPayments, setLinkedPayments] = useState<string[]>([]);
 
@@ -53,6 +56,119 @@ function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // ストリークの動的計算 (今日 2026-05-31 から遡ってコンビニを利用していない日数を数える)
+  const checkStreak = (receiptsData: Receipt[], baseDateStr: string = '2026-05-31'): { currentStreak: number; lastConviniDate: string | null } => {
+    if (receiptsData.length === 0) {
+      return { currentStreak: 0, lastConviniDate: null };
+    }
+
+    const usedDates = new Set(receiptsData.map(r => r.date.split('T')[0]));
+    
+    // 日付順に降順ソートされたレシートから、最新のコンビニ利用日を取得
+    const sortedReceipts = [...receiptsData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const lastConviniDate = sortedReceipts[0].date.split('T')[0];
+
+    let currentStreak = 0;
+    const checkDate = new Date(`${baseDateStr}T12:00:00`); // タイムゾーンずれを防ぐため昼12時
+
+    while (true) {
+      const dateStr = checkDate.toISOString().split('T')[0];
+      if (usedDates.has(dateStr)) {
+        break; // 利用した日が見つかった時点でストップ
+      }
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+      
+      if (currentStreak > 365) break; // 安全弁
+    }
+
+    return { currentStreak, lastConviniDate };
+  };
+
+  // マイルストーンのチェックとモーダル表示
+  const checkMilestones = (currentStreak: number) => {
+    if (!session) return;
+    const milestones = [
+      { days: 3, message: '🎉 3日達成！いいスタートです' },
+      { days: 7, message: '🔥 1週間達成！節約の習慣が身についてきました' },
+      { days: 14, message: '💪 2週間！もう立派な節約家です' },
+      { days: 30, message: '🏆 1ヶ月達成！コンビニ断ちマスターです' }
+    ];
+
+    const target = milestones.find(m => m.days === currentStreak);
+    if (target) {
+      const key = `cobaco_milestone_shown_${session.user.id}_${target.days}`;
+      const isShown = localStorage.getItem(key);
+      if (!isShown) {
+        setActiveMilestone(target);
+        localStorage.setItem(key, 'true');
+      }
+    }
+  };
+
+  // ストリーク情報の取得とSupabase同期
+  const fetchAndSyncStreak = async (currentReceipts: Receipt[]) => {
+    if (!session) return;
+    try {
+      // 1. Supabaseから現在のレコードを取得
+      const { data, error } = await supabase
+        .from('streaks')
+        .select('current_streak, best_streak, last_convini_date')
+        .eq('user_id', session.user.id)
+        .single();
+
+      let dbCurrent = 0;
+      let dbBest = 0;
+      let dbLastDate: string | null = null;
+      let hasRecord = false;
+
+      if (!error && data) {
+        dbCurrent = data.current_streak;
+        dbBest = data.best_streak;
+        dbLastDate = data.last_convini_date;
+        hasRecord = true;
+      } else if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      // 2. ローカルでストリークを計算
+      const { currentStreak, lastConviniDate } = checkStreak(currentReceipts);
+
+      // 3. ベストストリークの更新
+      let newBest = dbBest;
+      if (currentStreak > dbBest) {
+        newBest = currentStreak;
+      }
+
+      // 4. 不整合があればDBへ同期保存(upsert)
+      if (!hasRecord || dbCurrent !== currentStreak || dbBest !== newBest || dbLastDate !== lastConviniDate) {
+        const { error: upsertError } = await supabase
+          .from('streaks')
+          .upsert({
+            user_id: session.user.id,
+            current_streak: currentStreak,
+            best_streak: newBest,
+            last_convini_date: lastConviniDate,
+            updated_at: new Date().toISOString()
+          });
+
+        if (upsertError) throw upsertError;
+      }
+
+      setStreak({
+        currentStreak,
+        bestStreak: newBest,
+        lastConviniDate
+      });
+
+      // 5. 祝福モーダル判定
+      checkMilestones(currentStreak);
+
+    } catch (e) {
+      console.error('Failed to sync streak with Supabase', e);
+    }
+  };
 
   // Supabaseから履歴一覧を取得する
   const fetchReceipts = async () => {
@@ -89,6 +205,8 @@ function App() {
       });
 
       setReceipts(mapped);
+      // ストリークの同期と計算を実行
+      fetchAndSyncStreak(mapped);
     } catch (e) {
       console.error('Failed to fetch receipts from Supabase', e);
     }
@@ -170,6 +288,7 @@ function App() {
       setSavingsGoals([]);
       setMonthlyBaseSavings(5000);
       setMonthlyIncome(null);
+      setStreak({ currentStreak: 0, bestStreak: 0, lastConviniDate: null });
       setIsLoading(false);
     }
   }, [session]);
@@ -502,6 +621,7 @@ function App() {
             {activeTab === 'home' && (
               <HomeView
                 receipts={receipts}
+                streak={streak}
                 onNavigate={setActiveTab}
                 onDeleteReceipt={handleDeleteReceipt}
                 onOpenSettings={() => setShowSettingsModal(true)}
@@ -628,6 +748,54 @@ function App() {
           onClose={() => setEditingReceipt(null)}
           onSave={(updated) => handleUpdateReceipt(editingReceipt.id, updated)}
         />
+      )}
+
+      {/* マイルストーン祝福モーダル */}
+      {activeMilestone && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          zIndex: 5000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out',
+          padding: '24px'
+        }}>
+          <div className="ios-card" style={{
+            width: '100%',
+            maxWidth: '300px',
+            textAlign: 'center',
+            padding: '24px 20px',
+            backgroundColor: 'var(--ios-bg)',
+            borderRadius: '20px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            animation: 'slideUp 0.3s cubic-bezier(0.1, 0.8, 0.3, 1)'
+          }}>
+            <div style={{ fontSize: '48px' }}>
+              {activeMilestone.days === 3 ? '🥉' : activeMilestone.days === 7 ? '🥈' : activeMilestone.days === 14 ? '🥇' : '🏆'}
+            </div>
+            <div style={{ fontSize: '18px', fontWeight: '800' }}>ストリーク達成！</div>
+            <p style={{ fontSize: '13px', color: 'var(--ios-text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              {activeMilestone.message}
+            </p>
+            <button
+              onClick={() => setActiveMilestone(null)}
+              className="ios-btn"
+              style={{ width: '100%', padding: '10px 0', borderRadius: '10px', fontSize: '14px' }}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ホームインジケータ */}

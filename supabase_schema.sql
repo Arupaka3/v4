@@ -123,3 +123,28 @@ WITH CHECK (auth.uid() = user_id);
 
 -- Migration for existing environments
 ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS monthly_income bigint;
+
+-- Create streaks table (NEW)
+CREATE TABLE IF NOT EXISTS public.streaks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    current_streak INTEGER DEFAULT 0 NOT NULL,
+    best_streak INTEGER DEFAULT 0 NOT NULL,
+    last_convini_date DATE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
+);
+
+-- Enable Row Level Security (RLS) for streaks
+ALTER TABLE public.streaks ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policy if exists to avoid errors
+DROP POLICY IF EXISTS "Users can manage own streaks" ON public.streaks;
+
+-- Policy for streaks
+CREATE POLICY "Users can manage own streaks" 
+ON public.streaks 
+FOR ALL 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+

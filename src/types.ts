@@ -23,3 +23,10 @@ export interface SpendingGoal {
   monthlyCountLimit: number;
 }
 
+export interface Streak {
+  currentStreak: number;
+  bestStreak: number;
+  lastConviniDate: string | null;
+}
+
+
