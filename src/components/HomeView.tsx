@@ -340,23 +340,6 @@ const HomeView: React.FC<HomeViewProps> = ({
           >
             <User size={18} />
           </button>
-          <button 
-            onClick={() => onNavigate('scan')}
-            style={{
-              border: 'none',
-              background: 'var(--ios-primary-light)',
-              color: 'var(--ios-primary)',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}
-          >
-            <Plus size={20} />
-          </button>
         </div>
       </div>
 
