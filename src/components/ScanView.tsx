@@ -48,21 +48,198 @@ const ScanView: React.FC<ScanViewProps> = ({ onAddReceipt, linkedPayments, onLin
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 日本語レシート解析パーサー
+  const parseReceiptText = (text: string) => {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+    // 1. 店舗名の抽出
+    let extractedStoreName = '';
+    const storeKeywords = [
+      { name: 'セブン-イレブン', match: ['セブン', 'SEVEN', 'seven-eleven'] },
+      { name: 'ファミリーマート', match: ['ファミリー', 'ファミマ', 'FamilyMart', 'familymart'] },
+      { name: 'ローソン', match: ['ローソン', 'LAWSON', 'lawson'] },
+      { name: 'ミニストップ', match: ['ミニストップ', 'MINISTOP', 'ministop'] },
+      { name: 'デイリーヤマザキ', match: ['デイリー', 'ヤマザキ', 'Daily'] }
+    ];
+
+    for (const kw of storeKeywords) {
+      if (kw.match.some(m => text.toLowerCase().includes(m.toLowerCase()))) {
+        const matchedLine = lines.find(line => kw.match.some(m => line.toLowerCase().includes(m.toLowerCase())));
+        extractedStoreName = matchedLine || kw.name;
+        break;
+      }
+    }
+
+    if (!extractedStoreName && lines.length > 0) {
+      extractedStoreName = lines[0];
+    }
+
+    // 2. 金額の抽出
+    let extractedAmount = 0;
+    const amountRegex = /(?:合計|支払|小計|お買上金額|領収金額|合\s*計)[\s:：¥￥]*([0-9,]+)/i;
+    const matchAmount = text.match(amountRegex);
+    if (matchAmount && matchAmount[1]) {
+      extractedAmount = parseInt(matchAmount[1].replace(/,/g, ''), 10);
+    } else {
+      const amountYenRegex = /([0-9,]+)\s*(?:円|yen)/i;
+      const matchYen = text.match(amountYenRegex);
+      if (matchYen && matchYen[1]) {
+        extractedAmount = parseInt(matchYen[1].replace(/,/g, ''), 10);
+      }
+    }
+
+    // 3. 日時の抽出
+    let extractedDate = '';
+    const dateRegex = /(\d{4}|\d{2})[\/\-年](\d{1,2})[\/\-月](\d{1,2})[日\s]?/;
+    const timeRegex = /(\d{1,2})[:：](\d{2})/;
+    
+    const matchDate = text.match(dateRegex);
+    const matchTime = text.match(timeRegex);
+
+    let year = new Date().getFullYear();
+    let month = new Date().getMonth() + 1;
+    let day = new Date().getDate();
+    let hour = new Date().getHours();
+    let minute = new Date().getMinutes();
+
+    if (matchDate) {
+      let parsedYear = parseInt(matchDate[1], 10);
+      if (parsedYear < 100) {
+        parsedYear += 2000;
+      }
+      year = parsedYear;
+      month = parseInt(matchDate[2], 10);
+      day = parseInt(matchDate[3], 10);
+    }
+
+    if (matchTime) {
+      hour = parseInt(matchTime[1], 10);
+      minute = parseInt(matchTime[2], 10);
+    }
+
+    const formatNum = (n: number) => String(n).padStart(2, '0');
+    extractedDate = `${year}-${formatNum(month)}-${formatNum(day)}T${formatNum(hour)}:${formatNum(minute)}`;
+
+    // 4. 商品一覧の抽出
+    const extractedItems: string[] = [];
+    const excludeKeywords = [
+      '合計', '小計', '支払', 'お釣', '領収', '課税', '対象', '軽減', '税率', '割引', '値引',
+      'クーポン', 'ポイント', '点数', 'クレジットカード', '現金', 'お預', '売上', 'レシート', '番号', '電話'
+    ];
+
+    for (const line of lines) {
+      if (excludeKeywords.some(kw => line.includes(kw))) {
+        continue;
+      }
+
+      const itemMatch = line.match(/^(.+?)[\s\t]+[¥￥\*※]?\d+/);
+      if (itemMatch && itemMatch[1]) {
+        const itemName = itemMatch[1].trim();
+        if (itemName.length > 1 && !/^\d+$/.test(itemName)) {
+          extractedItems.push(itemName);
+        }
+      }
+    }
+
+    const isImpulse = extractedAmount >= 1000 || hour >= 22 || hour < 5;
+    const impulseReasons: string[] = [];
+    if (hour >= 22 || hour < 5) impulseReasons.push('深夜利用');
+    if (extractedAmount >= 1000) impulseReasons.push('高額支出');
+
+    return {
+      storeName: extractedStoreName,
+      amount: extractedAmount,
+      date: extractedDate,
+      items: extractedItems.slice(0, 5),
+      isImpulse,
+      impulseReasons
+    };
+  };
+
+  // 本物の OCR.Space API 連携処理
+  const runOCR = async (base64Data: string) => {
+    setScanState('scanning');
+    
+    // APIキーの取得（無ければデモ用キーを利用）
+    const ocrApiKey = import.meta.env.VITE_OCR_SPACE_API_KEY || 'helloworld';
+
+    try {
+      const formData = new FormData();
+      formData.append('base64Image', base64Data);
+      formData.append('language', 'jpn');
+      formData.append('OCREngine', '2'); // 日本語レシートに強い最新エンジン2
+      formData.append('isTable', 'true'); // テーブル・表形式を強化
+
+      const response = await fetch('https://api.ocr.space/parse/image', {
+        method: 'POST',
+        headers: {
+          'apikey': ocrApiKey
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`API接続エラー: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.IsErroredOnProcessing || !result.ParsedResults || result.ParsedResults.length === 0) {
+        throw new Error(result.ErrorMessage || 'OCR処理に失敗しました。');
+      }
+
+      const parsedText = result.ParsedResults[0].ParsedText;
+      console.log('OCR Parsed Text:', parsedText);
+
+      // パーサーの実行
+      const parsedData = parseReceiptText(parsedText);
+
+      // フォーム初期値に設定
+      setStoreName(parsedData.storeName);
+      setAmount(parsedData.amount);
+      setDate(parsedData.date);
+      setItems(parsedData.items);
+      setIsImpulse(parsedData.isImpulse);
+      setImpulseReasons(parsedData.impulseReasons);
+
+      setScanState('parsed');
+    } catch (e) {
+      console.error('OCR.Space API Error:', e);
+      
+      // 失敗時の手動フォールバック処理
+      setStoreName('');
+      setAmount(0);
+      
+      const offset = new Date().getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(new Date().getTime() - offset)).toISOString().slice(0, 16);
+      setDate(localISOTime);
+      
+      setItems([]);
+      setIsImpulse(false);
+      setImpulseReasons([]);
+
+      alert('レシートの読み取りに失敗しました。手動で入力してください。');
+      setScanState('parsed'); // 失敗時も手動入力ができるフォーム画面へ切り替える
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          setUploadedImage(event.target.result as string);
-          startScanning();
+          const base64String = event.target.result as string;
+          setUploadedImage(base64String);
+          runOCR(base64String);
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const startScanning = () => {
+  // サンプルレシート用モックスキャン処理
+  const startMockScanning = () => {
     setScanState('scanning');
     setTimeout(() => {
       const randomIndex = Math.floor(Math.random() * PRESET_RECEIPTS.length);
@@ -76,7 +253,7 @@ const ScanView: React.FC<ScanViewProps> = ({ onAddReceipt, linkedPayments, onLin
       }
       
       const offset = now.getTimezoneOffset() * 60000;
-      const localISOTime = (new Date(now.getTime() - offset)).toISOString().slice(0, 16);
+      const localISOTime = (new Date(new Date().getTime() - offset)).toISOString().slice(0, 16);
 
       setStoreName(preset.storeName);
       setAmount(preset.amount);
@@ -92,7 +269,7 @@ const ScanView: React.FC<ScanViewProps> = ({ onAddReceipt, linkedPayments, onLin
   const handleQuickScan = () => {
     const dummyImage = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400" style="background:%23FFF"><rect x="10" y="10" width="280" height="380" fill="none" stroke="%23CCC" stroke-width="2" stroke-dasharray="5,5"/><text x="150" y="50" font-size="20" font-weight="bold" font-family="sans-serif" text-anchor="middle" fill="%23666">RECEIPT</text><line x1="30" y1="80" x2="270" y2="80" stroke="%23EEE" stroke-width="2"/><text x="150" y="200" font-size="14" font-family="sans-serif" text-anchor="middle" fill="%23AAA">Convenience Store Receipt</text></svg>`;
     setUploadedImage(dummyImage);
-    startScanning();
+    startMockScanning();
   };
 
   const handleSave = (e: React.FormEvent) => {
