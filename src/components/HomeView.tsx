@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
-import { Plus, ChevronRight, Calendar, TrendingUp, Flame, Sparkles, X, Trash2 } from 'lucide-react';
+import { Plus, ChevronRight, Calendar, TrendingUp, Flame, Sparkles, X, Trash2, User, Edit2 } from 'lucide-react';
 import type { Receipt, ActiveTab } from '../types';
 
 interface HomeViewProps {
   receipts: Receipt[];
   onNavigate: (tab: ActiveTab) => void;
   onDeleteReceipt?: (id: string) => void; // 履歴削除用
+  onOpenSettings?: () => void;
+  onEditReceipt?: (receipt: Receipt) => void;
 }
 
-const HomeView: React.FC<HomeViewProps> = ({ receipts, onNavigate, onDeleteReceipt }) => {
+const HomeView: React.FC<HomeViewProps> = ({ 
+  receipts, 
+  onNavigate, 
+  onDeleteReceipt, 
+  onOpenSettings, 
+  onEditReceipt 
+}) => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [graphPeriod, setGraphPeriod] = useState<7 | 30 | 90>(7);
   const [expandedReceipts, setExpandedReceipts] = useState<{ [id: string]: boolean }>({});
@@ -276,23 +284,43 @@ const HomeView: React.FC<HomeViewProps> = ({ receipts, onNavigate, onDeleteRecei
       {/* ビュータイトルと新規スキャンボタン */}
       <div className="view-title">
         <span>ホーム</span>
-        <button 
-          onClick={() => onNavigate('scan')}
-          style={{
-            border: 'none',
-            background: 'var(--ios-primary-light)',
-            color: 'var(--ios-primary)',
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <Plus size={20} />
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* 設定ボタン */}
+          <button 
+            onClick={() => onOpenSettings && onOpenSettings()}
+            style={{
+              border: 'none',
+              background: 'var(--ios-gray-light)',
+              color: 'var(--ios-text-main)',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <User size={18} />
+          </button>
+          <button 
+            onClick={() => onNavigate('scan')}
+            style={{
+              border: 'none',
+              background: 'var(--ios-primary-light)',
+              color: 'var(--ios-primary)',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <Plus size={20} />
+          </button>
+        </div>
       </div>
 
       {/* ストリーク機能 (連続達成日数) */}
@@ -744,12 +772,31 @@ const HomeView: React.FC<HomeViewProps> = ({ receipts, onNavigate, onDeleteRecei
                         {renderItemsList(receipt.id, receipt.items)}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                        <div style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <div style={{ textAlign: 'right', marginRight: '4px' }}>
                           <div style={{ fontSize: '14px', fontWeight: 800, fontFamily: 'Outfit', color: receipt.isImpulse ? 'var(--ios-red)' : 'var(--ios-text-main)' }}>
                             ¥{receipt.amount.toLocaleString()}
                           </div>
                         </div>
+                        {onEditReceipt && (
+                          <button
+                            onClick={() => {
+                              onEditReceipt(receipt);
+                            }}
+                            style={{
+                              border: 'none',
+                              background: 'none',
+                              color: 'var(--ios-primary)',
+                              cursor: 'pointer',
+                              padding: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        )}
                         {onDeleteReceipt && (
                           <button
                             onClick={() => {
@@ -768,7 +815,7 @@ const HomeView: React.FC<HomeViewProps> = ({ receipts, onNavigate, onDeleteRecei
                               justifyContent: 'center'
                             }}
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={15} />
                           </button>
                         )}
                       </div>

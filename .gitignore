@@ -26,3 +26,9 @@ dist-ssr
 # Local Cache & Temp
 .npm-cache
 temp-vite
+
+# Environment variables
+.env
+.env.production
+.env.local
+.env.*.local
