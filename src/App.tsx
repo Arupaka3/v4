@@ -327,7 +327,7 @@ function App() {
             best_streak: newBest,
             last_convini_date: lastConviniDate,
             updated_at: new Date().toISOString()
-          });
+          }, { onConflict: 'user_id' });
 
         if (upsertError) throw upsertError;
       }
@@ -861,7 +861,7 @@ function App() {
           monthly_base_savings: 15000,
           monthly_income: 250000,
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'user_id' });
       if (settingsError) throw settingsError;
 
       // --- 4. streaks の UPSERT ---
@@ -877,7 +877,7 @@ function App() {
           best_streak: 12,
           last_convini_date: lastConviniDateStr,
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'user_id' });
       if (streaksError) throw streaksError;
 
       // --- 5. フロント側のローカルストレージ (spendingGoal等) の更新 ---
@@ -894,9 +894,11 @@ function App() {
 
       triggerNotification('✅ デモデータを投入しました。ページを更新してください。');
       alert('✅ デモデータを投入しました。ページを更新してください。');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to inject demo data', e);
+      const errMsg = e?.message || JSON.stringify(e);
       triggerNotification('❌ デモデータの投入に失敗しました');
+      alert('❌ デモデータの投入に失敗しました:\n' + errMsg);
     } finally {
       setIsLoading(false);
     }
