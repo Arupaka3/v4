@@ -64,6 +64,9 @@ const GoalsView: React.FC<GoalsViewProps> = ({
   // 未来予測削減率の選択状態 (要件3: 10%, 20%, 30%, 50% から選択)
   const [reductionRate, setReductionRate] = useState<10 | 20 | 30 | 50>(30);
 
+  // 未来予測シミュレーションの対象月数 (3, 6, 12, 24ヶ月) (NEW)
+  const [simulationMonths, setSimulationMonths] = useState<3 | 6 | 12 | 24>(12);
+
   // 欲しいもの追加用フォーム
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState<number>(0);
@@ -126,7 +129,7 @@ const GoalsView: React.FC<GoalsViewProps> = ({
   // 合計の月間貯蓄可能額
   const totalMonthlySavings = monthlyBaseSavings + monthlyReductionSavings;
 
-  // 12ヶ月後までの累積データを生成 (0〜12ヶ月後、計13点)
+  // 指定月数後までの累積データを生成 (0〜simulationMonths後、計simulationMonths+1点)
   interface ChartPoint {
     name: string;
     monthOffset: number;
@@ -136,7 +139,7 @@ const GoalsView: React.FC<GoalsViewProps> = ({
   const chartData: ChartPoint[] = [];
   const currentMonthIdx = today.getMonth(); // 0-11
   
-  for (let i = 0; i <= 12; i++) {
+  for (let i = 0; i <= simulationMonths; i++) {
     const m = (currentMonthIdx + i) % 12;
     const monthName = `${m + 1}月`;
     chartData.push({
@@ -507,9 +510,41 @@ const GoalsView: React.FC<GoalsViewProps> = ({
           </div>
         ) : (
           <div className="ios-card" style={{ padding: '16px', overflow: 'hidden', backgroundColor: '#FFFFFF', border: '1px solid rgba(0,0,0,0.05)', marginBottom: '16px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--ios-text-secondary)', display: 'block', marginBottom: '16px' }}>
-              貯蓄額シミュレーション (12ヶ月後まで)
-            </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--ios-text-secondary)' }}>
+                貯蓄額シミュレーション ({simulationMonths}ヶ月後まで)
+              </span>
+              {/* 表示期間（月数）のセグメンテッドコントロール */}
+              <div style={{
+                display: 'flex',
+                backgroundColor: 'rgba(120, 120, 128, 0.08)',
+                padding: '2px',
+                borderRadius: '8px'
+              }}>
+                {([3, 6, 12, 24] as const).map(months => (
+                  <button
+                    key={months}
+                    type="button"
+                    onClick={() => setSimulationMonths(months)}
+                    style={{
+                      border: 'none',
+                      background: simulationMonths === months ? '#FFFFFF' : 'transparent',
+                      boxShadow: simulationMonths === months ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      fontSize: '10px',
+                      fontWeight: simulationMonths === months ? '600' : '500',
+                      color: simulationMonths === months ? 'var(--ios-orange)' : 'var(--ios-text-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {months}ヶ月
+                  </button>
+                ))}
+              </div>
+            </div>
+            
             <div style={{ width: '100%', height: 220 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 20, right: 15, left: -15, bottom: 5 }}>
@@ -556,55 +591,64 @@ const GoalsView: React.FC<GoalsViewProps> = ({
                     activeDot={{ r: 6 }}
                   />
                   
-                  {/* wish_listの目標値ラインと交点マーク */}
-                  {savingsGoals.map(goal => {
-                    const remaining = Math.max(0, goal.price - (goal.currentSavings || 0));
-                    if (remaining <= 0) return null;
+                  {/* wish_listの目標値ラインと交点マーク (被り防止ロジック) */}
+                  {(() => {
+                    const sortedGoals = [...savingsGoals]
+                      .map(g => ({ ...g, remaining: Math.max(0, g.price - (g.currentSavings || 0)) }))
+                      .filter(g => g.remaining > 0)
+                      .sort((a, b) => a.remaining - b.remaining);
 
-                    if (totalMonthlySavings <= 0) return null;
-                    const monthsNeeded = Math.ceil(remaining / totalMonthlySavings);
-                    const showDot = monthsNeeded <= 12;
-                    const targetMonthName = showDot ? chartData[monthsNeeded].name : null;
+                    return sortedGoals.map((goal, idx) => {
+                      const remaining = goal.remaining;
+                      if (totalMonthlySavings <= 0) return null;
+                      const monthsNeeded = Math.ceil(remaining / totalMonthlySavings);
+                      const showDot = monthsNeeded <= simulationMonths;
+                      const targetMonthName = showDot ? (chartData[monthsNeeded] ? chartData[monthsNeeded].name : null) : null;
 
-                    return (
-                      <React.Fragment key={goal.id}>
-                        {/* 水平目標ライン */}
-                        <ReferenceLine
-                          y={remaining}
-                          stroke="#FF9500"
-                          strokeDasharray="3 3"
-                          strokeWidth={1}
-                          label={{
-                            value: goal.name,
-                            position: 'insideBottomLeft',
-                            fill: '#FF9500',
-                            fontSize: 9,
-                            fontWeight: '600',
-                            offset: 4
-                          }}
-                        />
-                        {/* 達成交点マーク */}
-                        {showDot && targetMonthName && (
-                          <ReferenceDot
-                            x={targetMonthName}
+                      // 隣接するラベルとの重複防止のため、左右交互に配置
+                      const labelPosition = idx % 2 === 0 ? 'insideBottomLeft' : 'insideBottomRight';
+                      const labelColor = idx % 2 === 0 ? '#C67A00' : '#E67E22';
+
+                      return (
+                        <React.Fragment key={goal.id}>
+                          {/* 水平目標ライン */}
+                          <ReferenceLine
                             y={remaining}
-                            r={5}
-                            fill="#34C759"
-                            stroke="#FFFFFF"
-                            strokeWidth={2}
+                            stroke={labelColor}
+                            strokeDasharray="3 3"
+                            strokeWidth={1}
                             label={{
-                              value: `${monthsNeeded}ヶ月で達成！`,
-                              position: 'top',
-                              fill: '#34C759',
+                              value: `${goal.name} (¥${goal.price.toLocaleString()})`,
+                              position: labelPosition,
+                              fill: labelColor,
                               fontSize: 9,
-                              fontWeight: 'bold',
+                              fontWeight: '600',
                               offset: 6
                             }}
                           />
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+                          {/* 達成交点マーク */}
+                          {showDot && targetMonthName && (
+                            <ReferenceDot
+                              x={targetMonthName}
+                              y={remaining}
+                              r={5}
+                              fill="#34C759"
+                              stroke="#FFFFFF"
+                              strokeWidth={2}
+                              label={{
+                                value: `${goal.name}: ${monthsNeeded}ヶ月`,
+                                position: idx % 2 === 0 ? 'top' : 'bottom', // 点のラベルも被らないよう上下に分ける
+                                fill: '#34C759',
+                                fontSize: 9,
+                                fontWeight: 'bold',
+                                offset: 6
+                              }}
+                            />
+                          )}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
                 </LineChart>
               </ResponsiveContainer>
             </div>
