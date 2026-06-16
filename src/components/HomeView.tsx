@@ -24,12 +24,23 @@ const HomeView: React.FC<HomeViewProps> = ({
   const [expandedReceipts, setExpandedReceipts] = useState<{ [id: string]: boolean }>({});
   const [feedbackRandomIdx] = useState(() => Math.floor(Math.random() * 3));
 
-  // システムの「今日」の基準日付を 2026-05-31 とする
-  const TODAY_STR = '2026-05-31';
-  const today = new Date(`${TODAY_STR}T23:59:59`);
+  // システムの「今日」の基準日付 (現在の日付を使用)
+  const today = new Date();
 
-  // --- 今月の支出合計・利用回数を計算 (5月中) ---
-  const thisMonthReceipts = receipts.filter(r => r.date.startsWith('2026-05'));
+  // --- 今月の支出合計・利用回数を計算 (当月) ---
+  const currentLocalMonth = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  })();
+
+  const thisMonthReceipts = receipts.filter(r => {
+    const d = new Date(r.date);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}` === currentLocalMonth;
+  });
   const totalAmount = thisMonthReceipts.reduce((sum, r) => sum + r.amount, 0);
   const totalCount = thisMonthReceipts.length;
 
@@ -247,15 +258,26 @@ const HomeView: React.FC<HomeViewProps> = ({
 
   // グラフデータ (期間切り替え対応)
   const getGraphData = (period: number) => {
+    // 実際の「今日」を基準にする
     const days = Array.from({ length: period }, (_, i) => {
-      const d = new Date(TODAY_STR);
+      const d = new Date();
       d.setDate(d.getDate() - (period - 1 - i));
-      return d.toISOString().split('T')[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${date}`; // 'YYYY-MM-DD' (ローカルタイムゾーン)
     });
 
     const dailyAmounts = days.map(day => {
       return receipts
-        .filter(r => r.date.startsWith(day))
+        .filter(r => {
+          const rd = new Date(r.date);
+          const y = rd.getFullYear();
+          const m = String(rd.getMonth() + 1).padStart(2, '0');
+          const date = String(rd.getDate()).padStart(2, '0');
+          const rDay = `${y}-${m}-${date}`;
+          return rDay === day;
+        })
         .reduce((sum, r) => sum + r.amount, 0);
     });
 

@@ -83,23 +83,43 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ストリークの動的計算 (今日 2026-05-31 から遡ってコンビニを利用していない日数を数える)
-  const checkStreak = (receiptsData: Receipt[], baseDateStr: string = '2026-05-31'): { currentStreak: number; lastConviniDate: string | null } => {
+  // ストリークの動的計算 (今日から遡ってコンビニを利用していない日数を数える)
+  const checkStreak = (receiptsData: Receipt[], baseDateStr?: string): { currentStreak: number; lastConviniDate: string | null } => {
     if (receiptsData.length === 0) {
       return { currentStreak: 0, lastConviniDate: null };
     }
 
-    const usedDates = new Set(receiptsData.map(r => r.date.split('T')[0]));
+    // 各レシートの日付をローカルタイムゾーン (YYYY-MM-DD) に変換した Set を作る
+    const usedDates = new Set(receiptsData.map(r => {
+      const d = new Date(r.date);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${date}`;
+    }));
     
     // 日付順に降順ソートされたレシートから、最新のコンビニ利用日を取得
     const sortedReceipts = [...receiptsData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const lastConviniDate = sortedReceipts[0].date.split('T')[0];
+    const lastConviniD = new Date(sortedReceipts[0].date);
+    const lastConviniDate = `${lastConviniD.getFullYear()}-${String(lastConviniD.getMonth() + 1).padStart(2, '0')}-${String(lastConviniD.getDate()).padStart(2, '0')}`;
 
     let currentStreak = 0;
-    const checkDate = new Date(`${baseDateStr}T12:00:00`); // タイムゾーンずれを防ぐため昼12時
+    
+    // 基準日を決定 (引数がなければ実際の今日)
+    let checkDate: Date;
+    if (baseDateStr) {
+      checkDate = new Date(`${baseDateStr}T12:00:00`);
+    } else {
+      checkDate = new Date();
+      checkDate.setHours(12, 0, 0, 0); // タイムゾーンずれを防ぐため昼12時
+    }
 
     while (true) {
-      const dateStr = checkDate.toISOString().split('T')[0];
+      const y = checkDate.getFullYear();
+      const m = String(checkDate.getMonth() + 1).padStart(2, '0');
+      const date = String(checkDate.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${date}`;
+
       if (usedDates.has(dateStr)) {
         break; // 利用した日が見つかった時点でストップ
       }
