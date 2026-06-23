@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, PiggyBank, Plus, Trash2, Sliders, Sparkles } from 'lucide-react';
+import { Target, TrendingUp, PiggyBank, Plus, Trash2, Sliders, Sparkles, X } from 'lucide-react';
 import type { Receipt, SavingsGoal, SpendingGoal } from '../types';
 import {
   ResponsiveContainer,
@@ -24,6 +24,12 @@ interface GoalsViewProps {
   onDeleteSavingsGoal: (id: string) => void;
   onUpdateBaseSavings: (amount: number) => void;
 }
+
+const formatYAxis = (value: number) => {
+  if (value === 0) return '¥0';
+  if (value >= 10000) return `${value / 10000}万円`;
+  return `¥${value.toLocaleString()}`;
+};
 
 const GoalsView: React.FC<GoalsViewProps> = ({
   receipts,
@@ -433,54 +439,7 @@ const GoalsView: React.FC<GoalsViewProps> = ({
 
         </div>
 
-        {showAddForm && (
-          <form onSubmit={handleAddSavings} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', backgroundColor: '#FFFBF5', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255, 149, 0, 0.15)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div>
-                <label className="ios-input-label" style={{ fontSize: '11px' }}>欲しいもの</label>
-                <input
-                  type="text"
-                  className="ios-input"
-                  value={newItemName}
-                  onChange={e => setNewItemName(e.target.value)}
-                  placeholder="例: Nintendo Switch 2"
-                  required
-                  style={{ padding: '8px 12px', fontSize: '13px' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1 }}>
-                  <label className="ios-input-label" style={{ fontSize: '11px' }}>価格 (円)</label>
-                  <input
-                    type="number"
-                    className="ios-input"
-                    value={newItemPrice || ''}
-                    onChange={e => setNewItemPrice(Number(e.target.value))}
-                    placeholder="金額"
-                    min="100"
-                    required
-                    style={{ padding: '8px 12px', fontSize: '13px' }}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label className="ios-input-label" style={{ fontSize: '11px' }}>現在の貯蓄額 (任意)</label>
-                  <input
-                    type="number"
-                    className="ios-input"
-                    value={newItemSavings || ''}
-                    onChange={e => setNewItemSavings(Number(e.target.value))}
-                    placeholder="すでに貯まった額"
-                    min="0"
-                    style={{ padding: '8px 12px', fontSize: '13px' }}
-                  />
-                </div>
-              </div>
-            </div>
-            <button type="submit" className="ios-btn" style={{ backgroundColor: 'var(--ios-orange)', padding: '8px 12px', fontSize: '13px', borderRadius: '8px' }}>
-              欲しいものを追加する
-            </button>
-          </form>
-        )}
+        {/* showAddForm のインラインフォームは削除し、ハーフモーダル化するためここには配置しません */}
 
         {/* 削減率選択コントロール (要件3: 10%, 20%, 30%, 50% 押しボタン) */}
         <div style={{ backgroundColor: '#FAFAFC', padding: '16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid var(--ios-border)' }}>
@@ -530,17 +489,30 @@ const GoalsView: React.FC<GoalsViewProps> = ({
             ))}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderTop: '0.5px solid var(--ios-border)', paddingTop: '12px' }}>
-            <div>
-              <span style={{ color: 'var(--ios-text-secondary)', display: 'block', fontSize: '9px' }}>追加の月間節約額 (浮くお金)</span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--ios-orange)', fontFamily: 'Outfit' }}>
-                +¥{monthlyReductionSavings.toLocaleString()} <span style={{ fontSize: '9px', fontWeight: '500' }}>/月</span>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            fontSize: '11px',
+            borderTop: '0.5px solid var(--ios-border)',
+            paddingTop: '12px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--ios-text-secondary)' }}>現在のコンビニ月平均支出</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ios-text-main)', fontFamily: 'Outfit' }}>
+                ¥{monthlySpent.toLocaleString()} /月
               </span>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ color: 'var(--ios-text-secondary)', display: 'block', fontSize: '9px' }}>月間総貯蓄予測 (基本 ¥{monthlyBaseSavings.toLocaleString()} 含)</span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--ios-text-main)', fontFamily: 'Outfit' }}>
-                ¥{totalMonthlySavings.toLocaleString()} <span style={{ fontSize: '9px', fontWeight: '500' }}>/月</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--ios-text-secondary)' }}>{reductionRate}%削減時の節約可能額</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ios-orange)', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                +¥{monthlyReductionSavings.toLocaleString()} /月 🟠
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--ios-text-secondary)' }}>月間総貯蓄予測（基本¥{monthlyBaseSavings.toLocaleString()}含）</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ios-text-main)', fontFamily: 'Outfit' }}>
+                ¥{totalMonthlySavings.toLocaleString()} /月
               </span>
             </div>
           </div>
@@ -562,62 +534,69 @@ const GoalsView: React.FC<GoalsViewProps> = ({
           <div className="ios-card" style={{ padding: '16px', overflow: 'hidden', backgroundColor: '#FFFFFF', border: '1px solid rgba(0,0,0,0.05)', marginBottom: '16px' }}>
             {/* 欲しいものピル型選択タブ (NEW) */}
             {savingsGoals.length > 0 && (
-              <div style={{
-                display: 'flex',
-                gap: '8px',
-                overflowX: 'auto',
-                whiteSpace: 'nowrap',
-                paddingBottom: '8px',
-                marginBottom: '14px',
-                borderBottom: '0.5px solid var(--ios-border)',
-                WebkitOverflowScrolling: 'touch',
-                msOverflowStyle: 'none',
-                scrollbarWidth: 'none'
-              }}>
-                {savingsGoals.map(goal => {
-                  const isSelected = selectedGoalId === goal.id;
-                  return (
-                    <button
-                      key={goal.id}
-                      id={`goal-tab-${goal.id}`}
-                      type="button"
-                      onClick={() => handleSelectGoal(goal.id)}
-                      style={{
-                        flexShrink: 0,
-                        border: 'none',
-                        background: isSelected ? 'var(--ios-orange)' : 'rgba(120, 120, 128, 0.08)',
-                        color: isSelected ? '#FFFFFF' : 'var(--ios-text-secondary)',
-                        borderRadius: '20px',
-                        padding: '6px 12px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {goal.name} ¥{goal.price.toLocaleString()}
-                    </button>
-                  );
-                })}
+              <div style={{ position: 'relative', width: '100%' }}>
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  overflowX: 'auto',
+                  whiteSpace: 'nowrap',
+                  paddingBottom: '8px',
+                  paddingRight: '36px', // ボタン用のスペースを確保
+                  marginBottom: '14px',
+                  borderBottom: '0.5px solid var(--ios-border)',
+                  WebkitOverflowScrolling: 'touch',
+                  msOverflowStyle: 'none',
+                  scrollbarWidth: 'none'
+                }}>
+                  {savingsGoals.map(goal => {
+                    const isSelected = selectedGoalId === goal.id;
+                    return (
+                      <button
+                        key={goal.id}
+                        id={`goal-tab-${goal.id}`}
+                        type="button"
+                        onClick={() => handleSelectGoal(goal.id)}
+                        style={{
+                          flexShrink: 0,
+                          border: 'none',
+                          background: isSelected ? 'var(--ios-orange)' : 'rgba(120, 120, 128, 0.08)',
+                          color: isSelected ? '#FFFFFF' : 'var(--ios-text-secondary)',
+                          borderRadius: '20px',
+                          padding: '6px 12px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {goal.name} ¥{goal.price.toLocaleString()}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* 固定配置するグリーンの丸ボタン */}
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(!showAddForm)}
+                  onClick={() => setShowAddForm(true)}
                   style={{
-                    flexShrink: 0,
-                    border: '1px dashed var(--ios-orange)',
-                    background: 'transparent',
-                    color: 'var(--ios-orange)',
-                    borderRadius: '20px',
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
+                    position: 'absolute',
+                    right: 0,
+                    top: '0px',
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--ios-primary)',
+                    color: '#FFFFFF',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(52, 199, 89, 0.3)',
+                    zIndex: 10
                   }}
                 >
-                  <Plus size={10} /> 追加
+                  <Plus size={14} />
                 </button>
               </div>
             )}
@@ -671,10 +650,10 @@ const GoalsView: React.FC<GoalsViewProps> = ({
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#8E8E93', fontSize: 10 }}
-                    tickFormatter={(value) => `¥${(value / 1000).toLocaleString()}k`}
+                    tickFormatter={formatYAxis}
                   />
                   <Tooltip
-                    formatter={(value: any) => [`¥${Number(value).toLocaleString()}`, '']}
+                    formatter={(value: any) => [formatYAxis(Number(value)), '']}
                     labelStyle={{ fontSize: 11, fontWeight: 'bold' }}
                     contentStyle={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -981,14 +960,6 @@ const GoalsView: React.FC<GoalsViewProps> = ({
                     ) : (
                       <>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(0,0,0,0.05)', paddingBottom: '4px' }}>
-                            <span style={{ color: 'var(--ios-text-secondary)' }}>現在のコンビニ支出:</span>
-                            <span style={{ fontWeight: '700' }}>¥{monthlySpent.toLocaleString()} /月</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(0,0,0,0.05)', paddingBottom: '4px' }}>
-                            <span style={{ color: 'var(--ios-text-secondary)' }}>{reductionRate}% 削減時の節約可能額:</span>
-                            <span style={{ fontWeight: '700', color: 'var(--ios-orange)' }}>¥{monthlyReductionSavings.toLocaleString()} /月</span>
-                          </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', color: 'var(--ios-text-main)' }}>
                             <span>購入予測 (削減後ペース):</span>
                             <span>
@@ -1031,8 +1002,138 @@ const GoalsView: React.FC<GoalsViewProps> = ({
               );
             })
           )}
+          
+          {/* 欲しいものを追加するアウトラインボタン (場所B) */}
+          {savingsGoals.length > 0 && (
+            <button
+              type="button"
+              className="ios-btn-outline-primary"
+              onClick={() => setShowAddForm(true)}
+              style={{ marginTop: '4px' }}
+            >
+              <Plus size={16} />
+              欲しいものを追加する
+            </button>
+          )}
         </div>
       </div>
+
+      {/* 欲しいもの追加モーダル (ハーフモーダル) */}
+      {showAddForm && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          zIndex: 3000,
+          display: 'flex',
+          alignItems: 'flex-end',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '100%',
+            maxHeight: '85%',
+            backgroundColor: 'var(--ios-bg)',
+            borderTopLeftRadius: '24px',
+            borderTopRightRadius: '24px',
+            padding: '20px 16px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'slideUp 0.3s cubic-bezier(0.1, 0.8, 0.3, 1)'
+          }}>
+            {/* ヘッダー */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+              paddingBottom: '12px',
+              borderBottom: '0.5px solid var(--ios-border)'
+            }}>
+              <span style={{ fontSize: '18px', fontWeight: '800' }}>欲しいものを追加</span>
+              <button 
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                style={{
+                  border: 'none',
+                  background: 'var(--ios-gray-light)',
+                  color: 'var(--ios-text-main)',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* フォーム */}
+            <form onSubmit={handleAddSavings} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="ios-input-group">
+                <label className="ios-input-label">欲しいもの</label>
+                <input
+                  type="text"
+                  className="ios-input"
+                  value={newItemName}
+                  onChange={e => setNewItemName(e.target.value)}
+                  placeholder="例: Nintendo Switch 2"
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="ios-input-group" style={{ flex: 1 }}>
+                  <label className="ios-input-label">価格 (円)</label>
+                  <input
+                    type="number"
+                    className="ios-input"
+                    value={newItemPrice || ''}
+                    onChange={e => setNewItemPrice(Number(e.target.value))}
+                    placeholder="金額"
+                    min="100"
+                    required
+                  />
+                </div>
+                <div className="ios-input-group" style={{ flex: 1 }}>
+                  <label className="ios-input-label">現在の貯蓄額 (任意)</label>
+                  <input
+                    type="number"
+                    className="ios-input"
+                    value={newItemSavings || ''}
+                    onChange={e => setNewItemSavings(Number(e.target.value))}
+                    placeholder="すでに貯まった額"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button 
+                  type="button" 
+                  className="ios-btn ios-btn-secondary"
+                  onClick={() => setShowAddForm(false)}
+                  style={{ flex: 1 }}
+                >
+                  キャンセル
+                </button>
+                <button 
+                  type="submit" 
+                  className="ios-btn"
+                  style={{ flex: 2, backgroundColor: 'var(--ios-orange)' }}
+                >
+                  追加する
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -441,4 +441,27 @@ body {
   }
 }
 
+.ios-btn-outline-primary {
+  background-color: transparent;
+  color: var(--ios-primary);
+  border: 1.5px solid var(--ios-primary);
+  border-radius: 14px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justifyContent: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ios-btn-outline-primary:active {
+  background-color: var(--ios-primary-light);
+  transform: scale(0.97);
+}
+
+
 
