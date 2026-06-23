@@ -871,7 +871,18 @@ const GoalsView: React.FC<GoalsViewProps> = ({
               </button>
             </div>
           ) : (
-            savingsGoals.map(goal => {
+            <>
+            {/* 欲しいものを追加するアウトラインボタン（上固定） */}
+            <button
+              type="button"
+              className="ios-btn-outline-primary"
+              onClick={() => setShowAddForm(true)}
+              style={{ marginBottom: '4px' }}
+            >
+              <Plus size={16} />
+              欲しいものを追加する
+            </button>
+            {savingsGoals.map(goal => {
               const currentSavings = goal.currentSavings || 0;
               // 達成率 (要件6: 未設定時は0%)
               const progressPercent = goal.price > 0 ? Math.min(Math.round((currentSavings / goal.price) * 100), 100) : 0;
@@ -1001,19 +1012,8 @@ const GoalsView: React.FC<GoalsViewProps> = ({
                 </div>
               );
             })
-          )}
-          
-          {/* 欲しいものを追加するアウトラインボタン (場所B) */}
-          {savingsGoals.length > 0 && (
-            <button
-              type="button"
-              className="ios-btn-outline-primary"
-              onClick={() => setShowAddForm(true)}
-              style={{ marginTop: '4px' }}
-            >
-              <Plus size={16} />
-              欲しいものを追加する
-            </button>
+            })}
+            </>
           )}
         </div>
       </div>
