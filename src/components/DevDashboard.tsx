@@ -26,6 +26,7 @@ const DevDashboard: React.FC<DevDashboardProps> = () => {
     last_convini_date: null
   });
   const [badges, setBadges] = useState<any[]>([]);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // ページネーション用ステート
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -510,7 +511,6 @@ const DevDashboard: React.FC<DevDashboardProps> = () => {
 
   // --- 全テーブル一括操作 ---
   const handleResetAllTablesAndInjectDemo = async () => {
-    if (!window.confirm('⚠️ 全テーブルのデータを全削除し、標準プリセットのデモデータに上書きします。よろしいですか？')) return;
 
     try {
       // 1. 全削除
@@ -584,21 +584,39 @@ const DevDashboard: React.FC<DevDashboardProps> = () => {
             <span style={{ fontSize: '11px', color: '#8E8E93', wordBreak: 'break-all' }}>現在ログイン中のユーザーID: {userId}</span>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={handleResetAllTablesAndInjectDemo}
-              style={{
-                backgroundColor: '#FF3B30',
-                color: '#FFF',
-                border: 'none',
-                padding: '10px 16px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer'
-              }}
-            >
-              ⚠️ 全テーブルリセット＋デモデータ投入
-            </button>
+            {showResetConfirm ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: '#2C2C2E', padding: '8px 12px', borderRadius: '8px', border: '1px solid #FF3B30' }}>
+                <span style={{ fontSize: '12px', color: '#FF3B30', fontWeight: '700' }}>本当に実行しますか？</span>
+                <button
+                  onClick={() => { setShowResetConfirm(false); handleResetAllTablesAndInjectDemo(); }}
+                  style={{ backgroundColor: '#FF3B30', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  はい、実行する
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  style={{ backgroundColor: '#3A3A3C', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  キャンセル
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                style={{
+                  backgroundColor: '#FF3B30',
+                  color: '#FFF',
+                  border: 'none',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                ⚠️ 全テーブルリセット＋デモデータ投入
+              </button>
+            )}
             <a
               href="/"
               style={{
