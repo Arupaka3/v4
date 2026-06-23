@@ -1011,7 +1011,6 @@ const GoalsView: React.FC<GoalsViewProps> = ({
                   </div>
                 </div>
               );
-            })
             })}
             </>
           )}
